@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
+    "postinstall": "npm run install:all",
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "build:client": "npm run build --prefix client",
+    "build": "npm run build:client",
     "start": "npm start --prefix server",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\""
   },
