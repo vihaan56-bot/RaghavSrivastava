@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     return res.json(data);
   } catch (error) {
     console.error('Error fetching portfolio data:', error);
-    return res.status(500).json({ message: 'Error retrieving portfolio data.' });
+    return res.status(500).json({ message: error.message || 'Error retrieving portfolio data.' });
   }
 });
 
@@ -38,7 +38,7 @@ router.put('/hero', authenticateToken, async (req, res) => {
     return res.json({ message: 'Hero section updated successfully.', hero: data.hero });
   } catch (error) {
     console.error('Error updating hero:', error);
-    return res.status(500).json({ message: 'Error updating hero data.' });
+    return res.status(500).json({ message: error.message || 'Error updating hero data.' });
   }
 });
 
@@ -55,7 +55,7 @@ router.put('/about', authenticateToken, async (req, res) => {
     return res.json({ message: 'About section updated successfully.', about: data.about });
   } catch (error) {
     console.error('Error updating about:', error);
-    return res.status(500).json({ message: 'Error updating about data.' });
+    return res.status(500).json({ message: error.message || 'Error updating about data.' });
   }
 });
 
@@ -74,7 +74,7 @@ router.put('/skills', authenticateToken, async (req, res) => {
     return res.json({ message: 'Skills updated successfully.', skills: data.skills });
   } catch (error) {
     console.error('Error updating skills:', error);
-    return res.status(500).json({ message: 'Error updating skills.' });
+    return res.status(500).json({ message: error.message || 'Error updating skills.' });
   }
 });
 
@@ -93,7 +93,7 @@ router.put('/education', authenticateToken, async (req, res) => {
     return res.json({ message: 'Education updated successfully.', education: data.education });
   } catch (error) {
     console.error('Error updating education:', error);
-    return res.status(500).json({ message: 'Error updating education.' });
+    return res.status(500).json({ message: error.message || 'Error updating education.' });
   }
 });
 
@@ -112,7 +112,7 @@ router.put('/experience', authenticateToken, async (req, res) => {
     return res.json({ message: 'Experience updated successfully.', experience: data.experience });
   } catch (error) {
     console.error('Error updating experience:', error);
-    return res.status(500).json({ message: 'Error updating experience.' });
+    return res.status(500).json({ message: error.message || 'Error updating experience.' });
   }
 });
 
@@ -131,7 +131,7 @@ router.put('/projects', authenticateToken, async (req, res) => {
     return res.json({ message: 'Projects updated successfully.', projects: data.projects });
   } catch (error) {
     console.error('Error updating projects:', error);
-    return res.status(500).json({ message: 'Error updating projects.' });
+    return res.status(500).json({ message: error.message || 'Error updating projects.' });
   }
 });
 
@@ -150,7 +150,7 @@ router.put('/achievements', authenticateToken, async (req, res) => {
     return res.json({ message: 'Achievements updated successfully.', achievements: data.achievements });
   } catch (error) {
     console.error('Error updating achievements:', error);
-    return res.status(500).json({ message: 'Error updating achievements.' });
+    return res.status(500).json({ message: error.message || 'Error updating achievements.' });
   }
 });
 

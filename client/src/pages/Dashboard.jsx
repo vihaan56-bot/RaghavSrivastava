@@ -552,7 +552,7 @@ export default function Dashboard() {
               )}
 
               <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="grid-form-2">
                   <div className="form-group">
                     <label className="form-label">Full Name</label>
                     <input type="text" className="form-input" value={heroForm.name || ''} onChange={e => setHeroForm({ ...heroForm, name: e.target.value })} />
@@ -568,7 +568,7 @@ export default function Dashboard() {
                   <textarea className="form-input" style={{ minHeight: '80px' }} value={heroForm.introduction || ''} onChange={e => setHeroForm({ ...heroForm, introduction: e.target.value })}></textarea>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="grid-form-2">
                   {/* Profile Image Uploader */}
                   <div className="form-group">
                     <label className="form-label">Profile Photo URL</label>
@@ -611,7 +611,7 @@ export default function Dashboard() {
                 <hr style={{ border: 'none', borderTop: '1px solid var(--card-border)', margin: '12px 0' }} />
                 <h3>Contact & Location details</h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                <div className="grid-form-3">
                   <div className="form-group">
                     <label className="form-label">Public Email</label>
                     <input type="email" className="form-input" value={heroForm.email || ''} onChange={e => setHeroForm({ ...heroForm, email: e.target.value })} />
@@ -626,7 +626,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="grid-form-2">
                   <div className="form-group">
                     <label className="form-label">GitHub URL</label>
                     <input type="url" className="form-input" value={heroForm.github || ''} onChange={e => setHeroForm({ ...heroForm, github: e.target.value })} />
@@ -899,7 +899,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', gap: '16px' }}>
+                    <div className="grid-form-3">
                       <div className="form-group">
                         <label className="form-label">Role Title</label>
                         <input type="text" className="form-input" value={exp.role} onChange={e => {
@@ -988,7 +988,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', gap: '16px' }}>
+                    <div className="grid-form-3">
                       <div className="form-group">
                         <label className="form-label">Degree / Program</label>
                         <input type="text" className="form-input" value={edu.degree} onChange={e => {
@@ -1126,7 +1126,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div className="grid-form-2">
                       <div className="form-group">
                         <label className="form-label">GitHub Repository URL</label>
                         <input type="url" className="form-input" value={proj.githubLink || ''} onChange={e => {
@@ -1207,7 +1207,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', gap: '16px' }}>
+                    <div className="grid-form-3">
                       <div className="form-group">
                         <label className="form-label">Title / Recognition</label>
                         <input type="text" className="form-input" value={ach.title} onChange={e => {
@@ -1368,7 +1368,21 @@ export default function Dashboard() {
 
       {/* Responsive layout style override for dashboard sidebar */}
       <style>{`
+        .grid-form-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+        .grid-form-3 {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 20px;
+        }
         @media (max-width: 768px) {
+          .grid-form-2, .grid-form-3 {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
           .dashboard-sidebar {
             flex: 1 0 100% !important;
             max-width: 100% !important;

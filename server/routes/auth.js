@@ -55,7 +55,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 
   try {
     const users = await getUsers();
-    const userIndex = users.findIndex(u => u.username === req.user.username);
+    const userIndex = users.findIndex(u => u.username.toLowerCase() === req.user.username.toLowerCase());
 
     if (userIndex === -1) {
       return res.status(404).json({ message: 'Admin user not found.' });
@@ -77,7 +77,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     return res.json({ message: 'Password updated successfully.' });
   } catch (error) {
     console.error('Change password error:', error);
-    return res.status(500).json({ message: 'Server error updating password.' });
+    return res.status(500).json({ message: error.message || 'Server error updating password.' });
   }
 });
 

@@ -292,8 +292,15 @@ export async function saveMessages(messages) {
 // User credentials getters & setters
 export async function getUsers() {
   if (isVercelKv) {
-    const data = await kv.get('users');
-    return data || [];
+    let data = await kv.get('users');
+    if (!data || data.length === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash("MaaMaa1234", salt);
+      const initialUsers = [{ username: "admin", passwordHash: hashedPassword }];
+      await kv.set('users', initialUsers);
+      data = initialUsers;
+    }
+    return data;
   }
   if (process.env.VERCEL) {
     const salt = await bcrypt.genSalt(10);
