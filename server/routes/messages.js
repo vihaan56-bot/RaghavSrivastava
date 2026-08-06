@@ -35,7 +35,7 @@ router.post('/', async (req, res) => {
     return res.status(201).json({ message: 'Message sent successfully.' });
   } catch (error) {
     console.error('Error saving contact message:', error);
-    return res.status(500).json({ message: 'Internal server error while sending message.' });
+    return res.status(500).json({ message: error.message || 'Internal server error while sending message.' });
   }
 });
 
@@ -48,7 +48,7 @@ router.get('/', authenticateToken, async (req, res) => {
     return res.json(sortedMessages);
   } catch (error) {
     console.error('Error fetching messages:', error);
-    return res.status(500).json({ message: 'Error retrieving messages.' });
+    return res.status(500).json({ message: error.message || 'Error retrieving messages.' });
   }
 });
 
@@ -68,7 +68,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     return res.json({ message: 'Message deleted successfully.' });
   } catch (error) {
     console.error('Error deleting message:', error);
-    return res.status(500).json({ message: 'Error deleting message.' });
+    return res.status(500).json({ message: error.message || 'Error deleting message.' });
   }
 });
 

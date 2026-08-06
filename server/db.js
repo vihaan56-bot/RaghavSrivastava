@@ -278,7 +278,8 @@ export async function saveMessages(messages) {
     return;
   }
   if (process.env.VERCEL) {
-    throw new Error("Local filesystem is read-only on Vercel. Please link a Vercel KV database to save messages.");
+    console.warn("WARNING: Vercel KV is not linked. Message received but not persisted. Payload:", messages[messages.length - 1]);
+    return;
   }
   await ensureDirs();
   const release = await dbLock.acquire();
