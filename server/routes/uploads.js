@@ -10,8 +10,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
+// Ensure upload directory exists (bypassed on Vercel as it is read-only)
+if (!process.env.VERCEL && !fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
