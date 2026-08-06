@@ -61,17 +61,24 @@ app.get('*', (req, res, next) => {
 });
 
 // Initialize database files and seed admin then start listening
-initializeDb()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`=================================================`);
-      console.log(`🚀 Server running on port http://localhost:${PORT}`);
-      console.log(`📁 Static uploads folder: ${path.join(__dirname, 'uploads')}`);
-      console.log(`🔐 Credentials initialized: admin / MaaMaa1234`);
-      console.log(`=================================================`);
+if (!process.env.VERCEL) {
+  initializeDb()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`=================================================`);
+        console.log(`🚀 Server running on port http://localhost:${PORT}`);
+        console.log(`📁 Static uploads folder: ${path.join(__dirname, 'uploads')}`);
+        console.log(`🔐 Credentials initialized: admin / MaaMaa1234`);
+        console.log(`=================================================`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to initialize database:', err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-  });
+} else {
+  // Under serverless Vercel, we run initializeDb asynchronously on imports
+  initializeDb().catch(err => console.error("KV initialization failed:", err));
+}
+
+export default app;
