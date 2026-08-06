@@ -269,10 +269,15 @@ export default function Dashboard() {
   // ==========================================
   // File Upload Helper
   // ==========================================
-  
   const handleFileUpload = async (e, targetField, sectionName, callback) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Check size limit: e.g. 2MB for base64 to avoid huge database payload
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File is too large. Max size is 2MB for Vercel deployment.");
+      return;
+    }
 
     setUploadProgress({ target: targetField, loading: true });
 
@@ -293,15 +298,31 @@ export default function Dashboard() {
         handleLogout();
         return;
       }
-      if (!res.ok) throw new Error(result.message || 'Upload failed.');
-
-      callback(result.url);
-      triggerStatus(sectionName, 'success', 'File uploaded successfully!');
+      
+      if (res.ok) {
+        callback(result.url);
+        triggerStatus(sectionName, 'success', 'File uploaded successfully!');
+        setUploadProgress({ target: '', loading: false });
+        return;
+      }
+      
+      console.warn('Server upload rejected, falling back to base64...', result.message);
     } catch (err) {
-      triggerStatus(sectionName, 'error', `Upload error: ${err.message}`);
-    } finally {
-      setUploadProgress({ target: '', loading: false });
+      console.warn('Server upload failed, falling back to base64 encoding...', err);
     }
+
+    // Base64 Reader Fallback (Critical for Vercel Serverless database persistence)
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      callback(reader.result);
+      triggerStatus(sectionName, 'success', 'File uploaded (Base64) successfully!');
+      setUploadProgress({ target: '', loading: false });
+    };
+    reader.onerror = () => {
+      triggerStatus(sectionName, 'error', 'Error reading file.');
+      setUploadProgress({ target: '', loading: false });
+    };
+    reader.readAsDataURL(file);
   };
 
   // ==========================================

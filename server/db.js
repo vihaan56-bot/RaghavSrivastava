@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import { kv } from '@vercel/kv';
+
+const isVercelKv = !!process.env.KV_REST_API_URL;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,6 +145,45 @@ const defaultPortfolio = {
 
 // Seeding function
 export async function initializeDb() {
+  if (isVercelKv) {
+    console.log("Checking Vercel KV Database connection...");
+    try {
+      // Seed portfolio
+      const portfolio = await kv.get('portfolio');
+      if (!portfolio) {
+        await kv.set('portfolio', defaultPortfolio);
+        console.log("Seeded default portfolio data to Vercel KV.");
+      }
+
+      // Seed messages
+      const messages = await kv.get('messages');
+      if (!messages) {
+        await kv.set('messages', []);
+        console.log("Initialized messages list in Vercel KV.");
+      }
+
+      // Seed users
+      const users = await kv.get('users');
+      if (!users) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash("MaaMaa1234", salt);
+        const initialUsers = [
+          {
+            username: "admin",
+            passwordHash: hashedPassword
+          }
+        ];
+        await kv.set('users', initialUsers);
+        console.log("Seeded initial admin user credentials to Vercel KV.");
+      }
+      console.log("Vercel KV database checked and initialized.");
+    } catch (err) {
+      console.error("Vercel KV initialization error:", err);
+      throw err;
+    }
+    return;
+  }
+
   await ensureDirs();
 
   // 1. Initialise Portfolio JSON
@@ -181,12 +223,20 @@ export async function initializeDb() {
 
 // Portfolio getters & setters
 export async function getPortfolioData() {
+  if (isVercelKv) {
+    const data = await kv.get('portfolio');
+    return data || defaultPortfolio;
+  }
   await ensureDirs();
   const data = await fs.readFile(PORTFOLIO_DB_PATH, 'utf-8');
   return JSON.parse(data);
 }
 
 export async function savePortfolioData(data) {
+  if (isVercelKv) {
+    await kv.set('portfolio', data);
+    return;
+  }
   await ensureDirs();
   const release = await dbLock.acquire();
   try {
@@ -198,12 +248,20 @@ export async function savePortfolioData(data) {
 
 // Message getters & setters
 export async function getMessages() {
+  if (isVercelKv) {
+    const data = await kv.get('messages');
+    return data || [];
+  }
   await ensureDirs();
   const data = await fs.readFile(MESSAGES_DB_PATH, 'utf-8');
   return JSON.parse(data);
 }
 
 export async function saveMessages(messages) {
+  if (isVercelKv) {
+    await kv.set('messages', messages);
+    return;
+  }
   await ensureDirs();
   const release = await dbLock.acquire();
   try {
@@ -215,12 +273,20 @@ export async function saveMessages(messages) {
 
 // User credentials getters & setters
 export async function getUsers() {
+  if (isVercelKv) {
+    const data = await kv.get('users');
+    return data || [];
+  }
   await ensureDirs();
   const data = await fs.readFile(USERS_DB_PATH, 'utf-8');
   return JSON.parse(data);
 }
 
 export async function saveUsers(users) {
+  if (isVercelKv) {
+    await kv.set('users', users);
+    return;
+  }
   await ensureDirs();
   const release = await dbLock.acquire();
   try {
