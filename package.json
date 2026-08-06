@@ -2,6 +2,7 @@
   "name": "raghav-portfolio-monorepo",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
     "postinstall": "npm run install:all",
