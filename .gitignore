@@ -1,0 +1,31 @@
+# Node dependencies
+node_modules/
+
+# Compiled client output
+dist/
+client/dist/
+
+# Persistent database files and uploaded assets (crucial for security)
+server/data/
+server/uploads/
+
+# Local environment variables
+.env
+.env*.local
+
+# Editor configs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
