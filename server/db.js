@@ -184,6 +184,11 @@ export async function initializeDb() {
     return;
   }
 
+  if (process.env.VERCEL) {
+    console.warn("WARNING: Running on Vercel without Vercel KV database linked. Seeding bypassed.");
+    return;
+  }
+
   await ensureDirs();
 
   // 1. Initialise Portfolio JSON
@@ -227,6 +232,10 @@ export async function getPortfolioData() {
     const data = await kv.get('portfolio');
     return data || defaultPortfolio;
   }
+  if (process.env.VERCEL) {
+    console.warn("WARNING: Serving default portfolio content as fallback on Vercel.");
+    return defaultPortfolio;
+  }
   await ensureDirs();
   const data = await fs.readFile(PORTFOLIO_DB_PATH, 'utf-8');
   return JSON.parse(data);
@@ -236,6 +245,9 @@ export async function savePortfolioData(data) {
   if (isVercelKv) {
     await kv.set('portfolio', data);
     return;
+  }
+  if (process.env.VERCEL) {
+    throw new Error("Local filesystem is read-only on Vercel. Please link a Vercel KV database in the dashboard storage tab to save modifications.");
   }
   await ensureDirs();
   const release = await dbLock.acquire();
@@ -252,6 +264,9 @@ export async function getMessages() {
     const data = await kv.get('messages');
     return data || [];
   }
+  if (process.env.VERCEL) {
+    return [];
+  }
   await ensureDirs();
   const data = await fs.readFile(MESSAGES_DB_PATH, 'utf-8');
   return JSON.parse(data);
@@ -261,6 +276,9 @@ export async function saveMessages(messages) {
   if (isVercelKv) {
     await kv.set('messages', messages);
     return;
+  }
+  if (process.env.VERCEL) {
+    throw new Error("Local filesystem is read-only on Vercel. Please link a Vercel KV database to save messages.");
   }
   await ensureDirs();
   const release = await dbLock.acquire();
@@ -277,6 +295,11 @@ export async function getUsers() {
     const data = await kv.get('users');
     return data || [];
   }
+  if (process.env.VERCEL) {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash("MaaMaa1234", salt);
+    return [{ username: "admin", passwordHash: hashedPassword }];
+  }
   await ensureDirs();
   const data = await fs.readFile(USERS_DB_PATH, 'utf-8');
   return JSON.parse(data);
@@ -286,6 +309,9 @@ export async function saveUsers(users) {
   if (isVercelKv) {
     await kv.set('users', users);
     return;
+  }
+  if (process.env.VERCEL) {
+    throw new Error("Local filesystem is read-only on Vercel. Please link a Vercel KV database to update credentials.");
   }
   await ensureDirs();
   const release = await dbLock.acquire();
