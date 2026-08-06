@@ -24,11 +24,11 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "dest": "client/assets/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/$1",
+      "dest": "client/$1",
       "continue": true
     },
     {
@@ -36,7 +36,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "client/index.html"
     }
   ]
 }
