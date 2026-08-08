@@ -3,8 +3,36 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import { kv } from '@vercel/kv';
+import admin from 'firebase-admin';
 
 const isVercelKv = !!process.env.KV_REST_API_URL;
+const isFirebase = !!(
+  process.env.FIREBASE_PROJECT_ID &&
+  process.env.FIREBASE_CLIENT_EMAIL &&
+  process.env.FIREBASE_PRIVATE_KEY &&
+  process.env.FIREBASE_DATABASE_URL
+);
+
+let firebaseDb = null;
+if (isFirebase) {
+  try {
+    if (admin.apps.length === 0) {
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: privateKey,
+        }),
+        databaseURL: process.env.FIREBASE_DATABASE_URL
+      });
+      console.log("Firebase Admin SDK initialized successfully.");
+    }
+    firebaseDb = admin.database();
+  } catch (err) {
+    console.error("Failed to initialize Firebase Admin:", err);
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,6 +173,40 @@ const defaultPortfolio = {
 
 // Seeding function
 export async function initializeDb() {
+  if (isFirebase) {
+    console.log("Checking Firebase Realtime Database connection...");
+    try {
+      const portfolioRef = firebaseDb.ref('portfolio');
+      const portfolioSnap = await portfolioRef.once('value');
+      if (!portfolioSnap.exists()) {
+        await portfolioRef.set(defaultPortfolio);
+        console.log("Seeded default portfolio data to Firebase.");
+      }
+
+      const messagesRef = firebaseDb.ref('messages');
+      const messagesSnap = await messagesRef.once('value');
+      if (!messagesSnap.exists()) {
+        await messagesRef.set([]);
+        console.log("Initialized messages path in Firebase.");
+      }
+
+      const usersRef = firebaseDb.ref('users');
+      const usersSnap = await usersRef.once('value');
+      if (!usersSnap.exists()) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash("MaaMaa1234", salt);
+        const initialUsers = [{ username: "admin", passwordHash: hashedPassword }];
+        await usersRef.set(initialUsers);
+        console.log("Seeded initial admin user credentials to Firebase.");
+      }
+      console.log("Firebase Database checked and initialized.");
+    } catch (err) {
+      console.error("Firebase initialization error:", err);
+      throw err;
+    }
+    return;
+  }
+
   if (isVercelKv) {
     console.log("Checking Vercel KV Database connection...");
     try {
@@ -228,6 +290,11 @@ export async function initializeDb() {
 
 // Portfolio getters & setters
 export async function getPortfolioData() {
+  if (isFirebase) {
+    const snapshot = await firebaseDb.ref('portfolio').once('value');
+    const data = snapshot.val();
+    return data || defaultPortfolio;
+  }
   if (isVercelKv) {
     const data = await kv.get('portfolio');
     return data || defaultPortfolio;
@@ -242,6 +309,10 @@ export async function getPortfolioData() {
 }
 
 export async function savePortfolioData(data) {
+  if (isFirebase) {
+    await firebaseDb.ref('portfolio').set(data);
+    return;
+  }
   if (isVercelKv) {
     await kv.set('portfolio', data);
     return;
@@ -260,6 +331,11 @@ export async function savePortfolioData(data) {
 
 // Message getters & setters
 export async function getMessages() {
+  if (isFirebase) {
+    const snapshot = await firebaseDb.ref('messages').once('value');
+    const data = snapshot.val();
+    return data || [];
+  }
   if (isVercelKv) {
     const data = await kv.get('messages');
     return data || [];
@@ -273,6 +349,10 @@ export async function getMessages() {
 }
 
 export async function saveMessages(messages) {
+  if (isFirebase) {
+    await firebaseDb.ref('messages').set(messages);
+    return;
+  }
   if (isVercelKv) {
     await kv.set('messages', messages);
     return;
@@ -292,6 +372,19 @@ export async function saveMessages(messages) {
 
 // User credentials getters & setters
 export async function getUsers() {
+  if (isFirebase) {
+    let data = null;
+    const snapshot = await firebaseDb.ref('users').once('value');
+    data = snapshot.val();
+    if (!data || data.length === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash("MaaMaa1234", salt);
+      const initialUsers = [{ username: "admin", passwordHash: hashedPassword }];
+      await firebaseDb.ref('users').set(initialUsers);
+      data = initialUsers;
+    }
+    return data;
+  }
   if (isVercelKv) {
     let data = await kv.get('users');
     if (!data || data.length === 0) {
@@ -314,6 +407,10 @@ export async function getUsers() {
 }
 
 export async function saveUsers(users) {
+  if (isFirebase) {
+    await firebaseDb.ref('users').set(users);
+    return;
+  }
   if (isVercelKv) {
     await kv.set('users', users);
     return;
