@@ -273,9 +273,9 @@ export default function Dashboard() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check size limit: e.g. 2MB for base64 to avoid huge database payload
-    if (file.size > 2 * 1024 * 1024) {
-      alert("File is too large. Max size is 2MB for Vercel deployment.");
+    // Check size limit: 10MB max
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File is too large. Max size is 10MB.");
       return;
     }
 

@@ -6,7 +6,7 @@ import { kv } from '@vercel/kv';
 import admin from 'firebase-admin';
 
 const isVercelKv = !!process.env.KV_REST_API_URL;
-const isFirebase = !!(
+const hasFirebaseConfig = !!(
   process.env.FIREBASE_PROJECT_ID &&
   process.env.FIREBASE_CLIENT_EMAIL &&
   process.env.FIREBASE_PRIVATE_KEY &&
@@ -14,24 +14,46 @@ const isFirebase = !!(
 );
 
 let firebaseDb = null;
-if (isFirebase) {
+let isFirebase = false;
+
+if (hasFirebaseConfig) {
   try {
     if (admin.apps.length === 0) {
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+      const rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
+      const privateKey = rawKey.trim().replace(/^"|"$/g, '').replace(/\\n/g, '\n');
+      const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 
+        (process.env.FIREBASE_PROJECT_ID ? `${process.env.FIREBASE_PROJECT_ID}.appspot.com` : undefined);
+
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey: privateKey,
         }),
-        databaseURL: process.env.FIREBASE_DATABASE_URL
+        databaseURL: process.env.FIREBASE_DATABASE_URL,
+        storageBucket: bucketName
       });
       console.log("Firebase Admin SDK initialized successfully.");
     }
     firebaseDb = admin.database();
+    isFirebase = true;
   } catch (err) {
     console.error("Failed to initialize Firebase Admin:", err);
+    isFirebase = false;
   }
+}
+
+export function getFirebaseStorageBucket() {
+  if (admin.apps && admin.apps.length > 0) {
+    try {
+      const bucket = admin.storage().bucket();
+      return bucket;
+    } catch (e) {
+      console.warn("Firebase Storage bucket unavailable:", e.message);
+      return null;
+    }
+  }
+  return null;
 }
 
 const __filename = fileURLToPath(import.meta.url);
