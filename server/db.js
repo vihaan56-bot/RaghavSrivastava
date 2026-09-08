@@ -340,7 +340,7 @@ export async function savePortfolioData(data) {
     return;
   }
   if (process.env.VERCEL) {
-    throw new Error("Local filesystem is read-only on Vercel. Please link a Vercel KV database in the dashboard storage tab to save modifications.");
+    throw new Error("Firebase database environment variables are missing on Vercel! Please add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_DATABASE_URL in Vercel Settings -> Environment Variables.");
   }
   await ensureDirs();
   const release = await dbLock.acquire();
@@ -438,7 +438,7 @@ export async function saveUsers(users) {
     return;
   }
   if (process.env.VERCEL) {
-    throw new Error("Local filesystem is read-only on Vercel. Please link a Vercel KV database to update credentials.");
+    throw new Error("Firebase database environment variables are missing on Vercel! Please add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_DATABASE_URL in Vercel Settings -> Environment Variables.");
   }
   await ensureDirs();
   const release = await dbLock.acquire();
