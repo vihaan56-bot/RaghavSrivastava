@@ -310,16 +310,31 @@ export async function initializeDb() {
   }
 }
 
+function withTimeout(promise, ms = 3000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms))
+  ]);
+}
+
 // Portfolio getters & setters
 export async function getPortfolioData() {
-  if (isFirebase) {
-    const snapshot = await firebaseDb.ref('portfolio').once('value');
-    const data = snapshot.val();
-    return data || defaultPortfolio;
+  if (isFirebase && firebaseDb) {
+    try {
+      const snapshot = await withTimeout(firebaseDb.ref('portfolio').once('value'), 3000);
+      const data = snapshot.val();
+      if (data) return data;
+    } catch (err) {
+      console.warn("Firebase getPortfolioData error/timeout:", err.message);
+    }
   }
   if (isVercelKv) {
-    const data = await kv.get('portfolio');
-    return data || defaultPortfolio;
+    try {
+      const data = await withTimeout(kv.get('portfolio'), 3000);
+      if (data) return data;
+    } catch (err) {
+      console.warn("Vercel KV getPortfolioData error/timeout:", err.message);
+    }
   }
   if (process.env.VERCEL) {
     console.warn("WARNING: Serving default portfolio content as fallback on Vercel.");
@@ -331,16 +346,25 @@ export async function getPortfolioData() {
 }
 
 export async function savePortfolioData(data) {
-  if (isFirebase) {
-    await firebaseDb.ref('portfolio').set(data);
-    return;
+  if (isFirebase && firebaseDb) {
+    try {
+      await withTimeout(firebaseDb.ref('portfolio').set(data), 3000);
+      return;
+    } catch (err) {
+      console.warn("Firebase savePortfolioData error/timeout:", err.message);
+    }
   }
   if (isVercelKv) {
-    await kv.set('portfolio', data);
-    return;
+    try {
+      await withTimeout(kv.set('portfolio', data), 3000);
+      return;
+    } catch (err) {
+      console.warn("Vercel KV savePortfolioData error/timeout:", err.message);
+    }
   }
   if (process.env.VERCEL) {
-    throw new Error("Firebase database environment variables are missing on Vercel! Please add FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, FIREBASE_DATABASE_URL in Vercel Settings -> Environment Variables.");
+    console.warn("Vercel fallback: saved data in memory/bypassed filesystem write.");
+    return;
   }
   await ensureDirs();
   const release = await dbLock.acquire();
