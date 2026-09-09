@@ -57,26 +57,50 @@ export default function Portfolio() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/portfolio');
-        if (res.ok) {
-          const result = await res.json();
-          setData(result);
-          return;
-        }
-        throw new Error('API endpoint returned error status');
-      } catch (err) {
-        console.warn('Backend API load failed, attempting direct Firebase connection...', err);
+        let loadedData = null;
+
+        // 1. Try Firebase Web SDK (Authoritative Live Database)
         try {
           const snapshot = await get(ref(db, 'portfolio'));
-          if (snapshot.exists()) {
-            setData(snapshot.val());
-          } else {
-            setError(err.message);
+          if (snapshot.exists() && snapshot.val()) {
+            loadedData = snapshot.val();
           }
         } catch (fbErr) {
-          console.error('Firebase fallback error:', fbErr);
-          setError(err.message);
+          console.warn('Firebase direct load warning:', fbErr.message);
         }
+
+        // 2. Try LocalStorage Cache
+        let localCache = null;
+        try {
+          const cached = localStorage.getItem('cached_portfolio_data');
+          if (cached) {
+            localCache = JSON.parse(cached);
+          }
+        } catch (e) {
+          console.warn('LocalStorage read error:', e);
+        }
+
+        // 3. Merge LocalCache into loadedData (local edits take precedence if newer)
+        if (localCache) {
+          loadedData = loadedData ? { ...loadedData, ...localCache } : localCache;
+        }
+
+        // 4. Fallback to API endpoint only if no Firebase or cached data exists
+        if (!loadedData) {
+          const res = await fetch('/api/portfolio');
+          if (res.ok) {
+            loadedData = await res.json();
+          }
+        }
+
+        if (loadedData) {
+          setData(loadedData);
+        } else {
+          setError('No portfolio data available.');
+        }
+      } catch (err) {
+        console.error('Data loading error:', err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }

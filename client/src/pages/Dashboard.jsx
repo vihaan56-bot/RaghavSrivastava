@@ -50,23 +50,42 @@ export default function Dashboard() {
       try {
         setLoading(true);
         let portData = null;
+
+        // 1. Try Firebase Web SDK (Authoritative Live Database)
         try {
-          const portRes = await fetch('/api/portfolio');
-          if (portRes.ok) {
-            portData = await portRes.json();
+          const snapshot = await get(ref(db, 'portfolio'));
+          if (snapshot.exists() && snapshot.val()) {
+            portData = snapshot.val();
           }
-        } catch (fetchErr) {
-          console.warn('API fetch failed, reading from Firebase Web SDK...', fetchErr);
+        } catch (fbErr) {
+          console.warn('Firebase direct load warning in Dashboard:', fbErr.message);
         }
 
+        // 2. Try LocalStorage Cache
+        let localCache = null;
+        try {
+          const cached = localStorage.getItem('cached_portfolio_data');
+          if (cached) {
+            localCache = JSON.parse(cached);
+          }
+        } catch (e) {
+          console.warn('LocalStorage read error:', e);
+        }
+
+        // 3. Merge LocalCache (local edits take precedence if newer)
+        if (localCache) {
+          portData = portData ? { ...portData, ...localCache } : localCache;
+        }
+
+        // 4. Fallback to API endpoint only if no Firebase or cached data exists
         if (!portData) {
           try {
-            const snapshot = await get(ref(db, 'portfolio'));
-            if (snapshot.exists()) {
-              portData = snapshot.val();
+            const portRes = await fetch('/api/portfolio');
+            if (portRes.ok) {
+              portData = await portRes.json();
             }
-          } catch (fbErr) {
-            console.error('Firebase Web SDK read error:', fbErr);
+          } catch (fetchErr) {
+            console.warn('API fetch failed in Dashboard:', fetchErr);
           }
         }
 
