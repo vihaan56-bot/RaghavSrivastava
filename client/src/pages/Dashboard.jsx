@@ -6,6 +6,7 @@ import {
   Upload, Save, Check, AlertCircle, Eye
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import { db, storage, ref, get, set, storageRef, uploadBytes, getDownloadURL } from '../firebase';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('hero');
@@ -48,32 +49,54 @@ export default function Dashboard() {
     const fetchAllData = async () => {
       try {
         setLoading(true);
-        // Fetch Portfolio
-        const portRes = await fetch('/api/portfolio');
-        if (!portRes.ok) throw new Error('Failed to load portfolio.');
-        const portData = await portRes.json();
-        
-        setData(portData);
-        setHeroForm(portData.hero || {});
-        setAboutBio(portData.about?.bio || '');
-        setAboutDetails(portData.about?.details || []);
-        setSkills(portData.skills || []);
-        setExperiences(portData.experience || []);
-        setEducation(portData.education || []);
-        setProjects(portData.projects || []);
-        setAchievements(portData.achievements || []);
+        let portData = null;
+        try {
+          const portRes = await fetch('/api/portfolio');
+          if (portRes.ok) {
+            portData = await portRes.json();
+          }
+        } catch (fetchErr) {
+          console.warn('API fetch failed, reading from Firebase Web SDK...', fetchErr);
+        }
+
+        if (!portData) {
+          try {
+            const snapshot = await get(ref(db, 'portfolio'));
+            if (snapshot.exists()) {
+              portData = snapshot.val();
+            }
+          } catch (fbErr) {
+            console.error('Firebase Web SDK read error:', fbErr);
+          }
+        }
+
+        if (portData) {
+          setData(portData);
+          setHeroForm(portData.hero || {});
+          setAboutBio(portData.about?.bio || '');
+          setAboutDetails(portData.about?.details || []);
+          setSkills(portData.skills || []);
+          setExperiences(portData.experience || []);
+          setEducation(portData.education || []);
+          setProjects(portData.projects || []);
+          setAchievements(portData.achievements || []);
+        }
 
         // Fetch Messages
-        const msgRes = await fetch('/api/messages', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (msgRes.status === 401 || msgRes.status === 403) {
-          handleLogout();
-          return;
-        }
-        if (msgRes.ok) {
-          const msgData = await msgRes.json();
-          setMessages(msgData);
+        try {
+          const msgRes = await fetch('/api/messages', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (msgRes.status === 401 || msgRes.status === 403) {
+            handleLogout();
+            return;
+          }
+          if (msgRes.ok) {
+            const msgData = await msgRes.json();
+            setMessages(msgData);
+          }
+        } catch (mErr) {
+          console.warn('Messages fetch error:', mErr);
         }
       } catch (err) {
         setError(err.message);
@@ -132,120 +155,67 @@ export default function Dashboard() {
   // Save Handlers for Sections
   // ==========================================
 
-  const saveHero = async () => {
-    triggerStatus('hero', 'loading', 'Saving...');
+  const saveSectionWithFallback = async (sectionKey, apiPath, payload, payloadKey, stateSetter) => {
+    triggerStatus(sectionKey, 'loading', 'Saving...');
     try {
-      const res = await secureRequest('/api/portfolio/hero', {
+      const res = await secureRequest(`/api/portfolio/${apiPath}`, {
         method: 'PUT',
-        body: JSON.stringify(heroForm)
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save Hero.');
-      triggerStatus('hero', 'success', 'Hero saved successfully!');
+      if (res.ok) {
+        if (stateSetter && result[payloadKey || apiPath]) {
+          stateSetter(result[payloadKey || apiPath]);
+        }
+        triggerStatus(sectionKey, 'success', `${sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)} saved successfully!`);
+        return;
+      }
+      throw new Error(result.message || `Failed to save ${sectionKey}.`);
     } catch (err) {
-      triggerStatus('hero', 'error', err.message);
+      console.warn(`Backend API save for ${sectionKey} failed, attempting direct Firebase Web SDK save...`, err);
+      try {
+        const valueToSave = payloadKey ? payload[payloadKey] : payload;
+        await set(ref(db, `portfolio/${apiPath}`), valueToSave);
+        if (stateSetter) stateSetter(valueToSave);
+        triggerStatus(sectionKey, 'success', `${sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)} saved to Firebase!`);
+      } catch (fbErr) {
+        console.error(`Firebase save error for ${sectionKey}:`, fbErr);
+        triggerStatus(sectionKey, 'error', err.message);
+      }
     }
+  };
+
+  const saveHero = async () => {
+    await saveSectionWithFallback('hero', 'hero', heroForm);
   };
 
   const saveAbout = async () => {
-    triggerStatus('about', 'loading', 'Saving...');
-    try {
-      const res = await secureRequest('/api/portfolio/about', {
-        method: 'PUT',
-        body: JSON.stringify({ bio: aboutBio, details: aboutDetails })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save About.');
-      triggerStatus('about', 'success', 'About saved successfully!');
-    } catch (err) {
-      triggerStatus('about', 'error', err.message);
-    }
+    await saveSectionWithFallback('about', 'about', { bio: aboutBio, details: aboutDetails });
   };
 
   const saveSkills = async () => {
-    triggerStatus('skills', 'loading', 'Saving...');
-    try {
-      // Re-index order property before saving
-      const orderedSkills = skills.map((s, idx) => ({ ...s, order: idx + 1 }));
-      const res = await secureRequest('/api/portfolio/skills', {
-        method: 'PUT',
-        body: JSON.stringify({ skills: orderedSkills })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save Skills.');
-      setSkills(result.skills);
-      triggerStatus('skills', 'success', 'Skills saved successfully!');
-    } catch (err) {
-      triggerStatus('skills', 'error', err.message);
-    }
+    const orderedSkills = skills.map((s, idx) => ({ ...s, order: idx + 1 }));
+    await saveSectionWithFallback('skills', 'skills', { skills: orderedSkills }, 'skills', setSkills);
   };
 
   const saveExperience = async () => {
-    triggerStatus('experience', 'loading', 'Saving...');
-    try {
-      const ordered = experiences.map((item, idx) => ({ ...item, order: idx + 1 }));
-      const res = await secureRequest('/api/portfolio/experience', {
-        method: 'PUT',
-        body: JSON.stringify({ experience: ordered })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save Experience.');
-      setExperiences(result.experience);
-      triggerStatus('experience', 'success', 'Experience saved successfully!');
-    } catch (err) {
-      triggerStatus('experience', 'error', err.message);
-    }
+    const ordered = experiences.map((item, idx) => ({ ...item, order: idx + 1 }));
+    await saveSectionWithFallback('experience', 'experience', { experience: ordered }, 'experience', setExperiences);
   };
 
   const saveEducation = async () => {
-    triggerStatus('education', 'loading', 'Saving...');
-    try {
-      const ordered = education.map((item, idx) => ({ ...item, order: idx + 1 }));
-      const res = await secureRequest('/api/portfolio/education', {
-        method: 'PUT',
-        body: JSON.stringify({ education: ordered })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save Education.');
-      setEducation(result.education);
-      triggerStatus('education', 'success', 'Education saved successfully!');
-    } catch (err) {
-      triggerStatus('education', 'error', err.message);
-    }
+    const ordered = education.map((item, idx) => ({ ...item, order: idx + 1 }));
+    await saveSectionWithFallback('education', 'education', { education: ordered }, 'education', setEducation);
   };
 
   const saveProjects = async () => {
-    triggerStatus('projects', 'loading', 'Saving...');
-    try {
-      const ordered = projects.map((item, idx) => ({ ...item, order: idx + 1 }));
-      const res = await secureRequest('/api/portfolio/projects', {
-        method: 'PUT',
-        body: JSON.stringify({ projects: ordered })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save Projects.');
-      setProjects(result.projects);
-      triggerStatus('projects', 'success', 'Projects saved successfully!');
-    } catch (err) {
-      triggerStatus('projects', 'error', err.message);
-    }
+    const ordered = projects.map((item, idx) => ({ ...item, order: idx + 1 }));
+    await saveSectionWithFallback('projects', 'projects', { projects: ordered }, 'projects', setProjects);
   };
 
   const saveAchievements = async () => {
-    triggerStatus('achievements', 'loading', 'Saving...');
-    try {
-      const ordered = achievements.map((item, idx) => ({ ...item, order: idx + 1 }));
-      const res = await secureRequest('/api/portfolio/achievements', {
-        method: 'PUT',
-        body: JSON.stringify({ achievements: ordered })
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || 'Failed to save Achievements.');
-      setAchievements(result.achievements);
-      triggerStatus('achievements', 'success', 'Achievements saved successfully!');
-    } catch (err) {
-      triggerStatus('achievements', 'error', err.message);
-    }
+    const ordered = achievements.map((item, idx) => ({ ...item, order: idx + 1 }));
+    await saveSectionWithFallback('achievements', 'achievements', { achievements: ordered }, 'achievements', setAchievements);
   };
 
   const updatePassword = async (e) => {
@@ -267,7 +237,7 @@ export default function Dashboard() {
   };
 
   // ==========================================
-  // File Upload Helper
+  // File Upload Helper (API + Firebase Storage + Base64)
   // ==========================================
   const handleFileUpload = async (e, targetField, sectionName, callback) => {
     const file = e.target.files[0];
@@ -281,6 +251,7 @@ export default function Dashboard() {
 
     setUploadProgress({ target: targetField, loading: true });
 
+    // 1. Attempt Backend API upload
     const formData = new FormData();
     formData.append('file', file);
 
@@ -299,19 +270,32 @@ export default function Dashboard() {
         return;
       }
       
-      if (res.ok) {
+      if (res.ok && result.url) {
         callback(result.url);
         triggerStatus(sectionName, 'success', 'File uploaded successfully!');
         setUploadProgress({ target: '', loading: false });
         return;
       }
-      
-      console.warn('Server upload rejected, falling back to base64...', result.message);
     } catch (err) {
-      console.warn('Server upload failed, falling back to base64 encoding...', err);
+      console.warn('Server upload endpoint unreachable, trying Firebase Storage upload...', err);
     }
 
-    // Base64 Reader Fallback (Critical for Vercel Serverless database persistence)
+    // 2. Direct Firebase Storage Upload Fallback
+    try {
+      const sanitizedName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+      const filename = `${Date.now()}_${sanitizedName}`;
+      const fileRef = storageRef(storage, `uploads/${filename}`);
+      const snapshot = await uploadBytes(fileRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      callback(downloadUrl);
+      triggerStatus(sectionName, 'success', 'File uploaded to Firebase Storage!');
+      setUploadProgress({ target: '', loading: false });
+      return;
+    } catch (fbErr) {
+      console.warn('Firebase Storage upload failed, falling back to base64...', fbErr);
+    }
+
+    // 3. Base64 Reader Fallback
     const reader = new FileReader();
     reader.onloadend = () => {
       callback(reader.result);

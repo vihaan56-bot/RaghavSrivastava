@@ -42,6 +42,8 @@ import Footer from '../components/Footer';
 import SectionHeader from '../components/SectionHeader';
 import ProjectCard from '../components/ProjectCard';
 
+import { db, ref, get } from '../firebase';
+
 export default function Portfolio() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,12 +58,25 @@ export default function Portfolio() {
     const fetchData = async () => {
       try {
         const res = await fetch('/api/portfolio');
-        if (!res.ok) throw new Error('Failed to load portfolio content.');
-        const result = await res.json();
-        setData(result);
+        if (res.ok) {
+          const result = await res.json();
+          setData(result);
+          return;
+        }
+        throw new Error('API endpoint returned error status');
       } catch (err) {
-        console.error(err);
-        setError(err.message);
+        console.warn('Backend API load failed, attempting direct Firebase connection...', err);
+        try {
+          const snapshot = await get(ref(db, 'portfolio'));
+          if (snapshot.exists()) {
+            setData(snapshot.val());
+          } else {
+            setError(err.message);
+          }
+        } catch (fbErr) {
+          console.error('Firebase fallback error:', fbErr);
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
       }
