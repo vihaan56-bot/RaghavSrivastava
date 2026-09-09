@@ -56,51 +56,52 @@ export default function Portfolio() {
   // Fetch portfolio data
   useEffect(() => {
     const fetchData = async () => {
+      let loadedData = null;
+
+      // 1. Instant display from LocalStorage Cache if present
       try {
-        let loadedData = null;
-
-        // 1. Try Firebase Web SDK (Authoritative Live Database)
-        try {
-          const snapshot = await get(ref(db, 'portfolio'));
-          if (snapshot.exists() && snapshot.val()) {
-            loadedData = snapshot.val();
-          }
-        } catch (fbErr) {
-          console.warn('Firebase direct load warning:', fbErr.message);
-        }
-
-        // 2. Try LocalStorage Cache
-        let localCache = null;
-        try {
-          const cached = localStorage.getItem('cached_portfolio_data');
-          if (cached) {
-            localCache = JSON.parse(cached);
-          }
-        } catch (e) {
-          console.warn('LocalStorage read error:', e);
-        }
-
-        // 3. Merge LocalCache into loadedData (local edits take precedence if newer)
-        if (localCache) {
-          loadedData = loadedData ? { ...loadedData, ...localCache } : localCache;
-        }
-
-        // 4. Fallback to API endpoint only if no Firebase or cached data exists
-        if (!loadedData) {
-          const res = await fetch('/api/portfolio');
-          if (res.ok) {
-            loadedData = await res.json();
-          }
-        }
-
-        if (loadedData) {
+        const cached = localStorage.getItem('cached_portfolio_data');
+        if (cached) {
+          loadedData = JSON.parse(cached);
           setData(loadedData);
-        } else {
+          setLoading(false);
+        }
+      } catch (e) {
+        console.warn('LocalStorage read error:', e);
+      }
+
+      // 2. Parallel timed fetch from API and Firebase Web SDK
+      try {
+        const fetchApi = fetch('/api/portfolio')
+          .then(res => res.ok ? res.json() : null)
+          .catch(() => null);
+
+        const fetchFirebase = new Promise((resolve) => {
+          const timer = setTimeout(() => resolve(null), 2500);
+          get(ref(db, 'portfolio'))
+            .then(snapshot => {
+              clearTimeout(timer);
+              resolve(snapshot.exists() && snapshot.val() ? snapshot.val() : null);
+            })
+            .catch(() => {
+              clearTimeout(timer);
+              resolve(null);
+            });
+        });
+
+        const [apiData, fbData] = await Promise.all([fetchApi, fetchFirebase]);
+        
+        // Use Firebase data if available, otherwise API data, otherwise local cached data
+        const bestData = fbData || (apiData && apiData.hero ? apiData : null) || loadedData;
+        
+        if (bestData) {
+          setData(bestData);
+        } else if (!loadedData) {
           setError('No portfolio data available.');
         }
       } catch (err) {
         console.error('Data loading error:', err);
-        setError(err.message);
+        if (!loadedData) setError(err.message);
       } finally {
         setLoading(false);
       }

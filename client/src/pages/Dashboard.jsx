@@ -47,80 +47,83 @@ export default function Dashboard() {
     if (!token) return;
 
     const fetchAllData = async () => {
+      let loadedData = null;
+
+      // 1. Instant display from LocalStorage Cache if present
       try {
-        setLoading(true);
-        let portData = null;
-
-        // 1. Try Firebase Web SDK (Authoritative Live Database)
-        try {
-          const snapshot = await get(ref(db, 'portfolio'));
-          if (snapshot.exists() && snapshot.val()) {
-            portData = snapshot.val();
-          }
-        } catch (fbErr) {
-          console.warn('Firebase direct load warning in Dashboard:', fbErr.message);
+        const cached = localStorage.getItem('cached_portfolio_data');
+        if (cached) {
+          loadedData = JSON.parse(cached);
+          setData(loadedData);
+          setHeroForm(loadedData.hero || {});
+          setAboutBio(loadedData.about?.bio || '');
+          setAboutDetails(loadedData.about?.details || []);
+          setSkills(loadedData.skills || []);
+          setExperiences(loadedData.experience || []);
+          setEducation(loadedData.education || []);
+          setProjects(loadedData.projects || []);
+          setAchievements(loadedData.achievements || []);
+          setLoading(false);
         }
+      } catch (e) {
+        console.warn('LocalStorage read error:', e);
+      }
 
-        // 2. Try LocalStorage Cache
-        let localCache = null;
-        try {
-          const cached = localStorage.getItem('cached_portfolio_data');
-          if (cached) {
-            localCache = JSON.parse(cached);
-          }
-        } catch (e) {
-          console.warn('LocalStorage read error:', e);
-        }
+      // 2. Parallel timed fetch from API and Firebase Web SDK
+      try {
+        const fetchApi = fetch('/api/portfolio')
+          .then(res => res.ok ? res.json() : null)
+          .catch(() => null);
 
-        // 3. Merge LocalCache (local edits take precedence if newer)
-        if (localCache) {
-          portData = portData ? { ...portData, ...localCache } : localCache;
-        }
+        const fetchFirebase = new Promise((resolve) => {
+          const timer = setTimeout(() => resolve(null), 2500);
+          get(ref(db, 'portfolio'))
+            .then(snapshot => {
+              clearTimeout(timer);
+              resolve(snapshot.exists() && snapshot.val() ? snapshot.val() : null);
+            })
+            .catch(() => {
+              clearTimeout(timer);
+              resolve(null);
+            });
+        });
 
-        // 4. Fallback to API endpoint only if no Firebase or cached data exists
-        if (!portData) {
-          try {
-            const portRes = await fetch('/api/portfolio');
-            if (portRes.ok) {
-              portData = await portRes.json();
-            }
-          } catch (fetchErr) {
-            console.warn('API fetch failed in Dashboard:', fetchErr);
-          }
-        }
+        const [apiData, fbData] = await Promise.all([fetchApi, fetchFirebase]);
 
-        if (portData) {
-          setData(portData);
-          setHeroForm(portData.hero || {});
-          setAboutBio(portData.about?.bio || '');
-          setAboutDetails(portData.about?.details || []);
-          setSkills(portData.skills || []);
-          setExperiences(portData.experience || []);
-          setEducation(portData.education || []);
-          setProjects(portData.projects || []);
-          setAchievements(portData.achievements || []);
-        }
+        const bestData = fbData || (apiData && apiData.hero ? apiData : null) || loadedData;
 
-        // Fetch Messages
-        try {
-          const msgRes = await fetch('/api/messages', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (msgRes.status === 401 || msgRes.status === 403) {
-            handleLogout();
-            return;
-          }
-          if (msgRes.ok) {
-            const msgData = await msgRes.json();
-            setMessages(msgData);
-          }
-        } catch (mErr) {
-          console.warn('Messages fetch error:', mErr);
+        if (bestData) {
+          setData(bestData);
+          setHeroForm(bestData.hero || {});
+          setAboutBio(bestData.about?.bio || '');
+          setAboutDetails(bestData.about?.details || []);
+          setSkills(bestData.skills || []);
+          setExperiences(bestData.experience || []);
+          setEducation(bestData.education || []);
+          setProjects(bestData.projects || []);
+          setAchievements(bestData.achievements || []);
         }
       } catch (err) {
-        setError(err.message);
+        console.error('Data loading error in Dashboard:', err);
       } finally {
         setLoading(false);
+      }
+
+      // Fetch Messages
+      try {
+        const msgRes = await fetch('/api/messages', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (msgRes.status === 401 || msgRes.status === 403) {
+          handleLogout();
+          return;
+        }
+        if (msgRes.ok) {
+          const msgData = await msgRes.json();
+          setMessages(msgData);
+        }
+      } catch (mErr) {
+        console.warn('Messages fetch error:', mErr);
       }
     };
 
